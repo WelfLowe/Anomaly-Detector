@@ -4,7 +4,8 @@ import numpy as np
 from anomaly_detector.AnomalyDetectorAutoencoder import AnomalyDetectorAutoencoder
 from anomaly_detector.AnomalyDetectorCluster import AnomalyDetectorCluster
 from anomaly_detector.AnomalyDetectorClusterIsoForest import AnomalyDetectorIsoForest
-from anomaly_detector.AnomalyDetectorClusterOneClassSVM import AnomalyDetectorOneClassSVM
+from anomaly_detector.AnomalyDetectorLocalOutlierFactor import AnomalyDetectorLocalOutlierFactor
+from anomaly_detector.AnomalyDetectorOneClassSVM import AnomalyDetectorOneClassSVM
 
 K = 1000
 N = 500
@@ -14,6 +15,7 @@ ad = []
 ad.append(AnomalyDetectorCluster())
 ad.append(AnomalyDetectorIsoForest())
 ad.append(AnomalyDetectorOneClassSVM())
+ad.append(AnomalyDetectorLocalOutlierFactor())
 ad.append(AnomalyDetectorAutoencoder())
 
 n_training_sets =7

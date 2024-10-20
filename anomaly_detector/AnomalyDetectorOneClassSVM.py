@@ -19,8 +19,6 @@ class AnomalyDetectorOneClassSVM(AnomalyDetector):
         """Return accuracy and AUROC."""
 
         np.random.shuffle(self.data)
-        # Fit Isolation Forest
-        # Fit One-Class SVM
         svm = OneClassSVM(nu=0.05, kernel="rbf")  # nu is the proportion of outliers
         svm.fit(self.data)
 
