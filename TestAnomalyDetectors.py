@@ -6,6 +6,8 @@ from anomaly_detector.AnomalyDetectorCluster import AnomalyDetectorCluster
 from anomaly_detector.AnomalyDetectorClusterIsoForest import AnomalyDetectorIsoForest
 from anomaly_detector.AnomalyDetectorLocalOutlierFactor import AnomalyDetectorLocalOutlierFactor
 from anomaly_detector.AnomalyDetectorOneClassSVM import AnomalyDetectorOneClassSVM
+from anomaly_detector.AnomalyDetectorVanillaNF import AnomalyDetectorVanillaNF
+from anomaly_detector.AnomalyDetectorPSCAL import AnomalyDetectorPSCAL
 
 K = 1000
 N = 500
@@ -16,7 +18,9 @@ ad.append(AnomalyDetectorCluster())
 ad.append(AnomalyDetectorIsoForest())
 ad.append(AnomalyDetectorOneClassSVM())
 ad.append(AnomalyDetectorLocalOutlierFactor())
-ad.append(AnomalyDetectorAutoencoder())
+#ad.append(AnomalyDetectorAutoencoder())
+ad.append(AnomalyDetectorVanillaNF())
+ad.append(AnomalyDetectorPSCAL())
 
 n_training_sets =7
 n_severities = 5 
