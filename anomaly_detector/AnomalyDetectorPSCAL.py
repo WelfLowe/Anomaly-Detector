@@ -23,56 +23,62 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
         def train_one_epoch(model, optimizer, dataloader, std_cutoff):
             model.train()
             outliers = []
-
-            last_ok_batch_mean = None
-            last_ok_batch_std = None
+            last_mean, last_std = None, None
 
             for data, index in dataloader:
                 optimizer.zero_grad()
-
                 data = data.to(c.device)
 
                 z = model(data)
                 jac = model.nf.jacobian(run_forward=False)
-                #print(f"z: {z}")
-                #print(f"jac: {jac}")
-                loss = 0.5 * torch.sum(z**2, dim=(1, )) - jac
+                sample_losses = 0.5 * torch.sum(z**2, dim=1) - jac
 
-                batch_mean = torch.mean(loss)
-                batch_std = torch.std(loss)
+                batch_mean = torch.mean(sample_losses)
+                batch_std = torch.std(sample_losses)
+                threshold = batch_mean + std_cutoff * batch_std
 
-                # find indices of outliers
-                new_outliers = torch.where(loss > batch_mean +
-                                           std_cutoff * batch_std)[0]
-                if len(new_outliers) > 0:
-                    indices_of_outliers = list(index[new_outliers.detach().cpu(
-                    ).numpy()].detach().cpu().numpy())
-                    outliers += indices_of_outliers
-                else:
-                    loss = torch.mean(loss)
-                    loss.backward()
+                is_outlier = sample_losses > threshold
+                is_inlier = ~is_outlier
+
+                if is_outlier.any():
+                    outliers.extend(index[is_outlier].tolist())
+
+                if is_inlier.any():
+                    inlier_loss = torch.mean(sample_losses[is_inlier])
+                    inlier_loss.backward()
                     optimizer.step()
-                    last_ok_batch_mean = batch_mean
-                    last_ok_batch_std = batch_std
+                    
+                    last_mean = batch_mean.detach()
+                    last_std = batch_std.detach()
 
-            return outliers, last_ok_batch_mean, last_ok_batch_std
+            return outliers, last_mean, last_std
 
-        def check_for_inliers(model, dataloader, mean, std, std_cutoff):
+        @torch.no_grad()
+        def check_for_inliers(model, dataloader, mean, std, std_cutoff, eps):
             model.eval()
-            inliers = []
+            recovered_inliers = []
+            threshold = mean + std * std_cutoff
+
             for data, index in dataloader:
                 data = data.to(c.device)
-                z = model(data)
-                jac = model.nf.jacobian(run_forward=False)
-                loss = 0.5 * torch.sum(z**2, dim=(1, )) - jac
+                
+                # NOTE: eps-greedy exploration
+                rand_probs = torch.rand(data.size(0), device=c.device)
+                force_return = rand_probs < eps
+                test_candidates = ~force_return
 
-                # find indices of inliers
-                new_inliers = torch.where(loss < mean + std * std_cutoff)[0]
-                if len(new_inliers) > 0:
-                    indices_of_inliers = list(index[new_inliers.detach().cpu(
-                    ).numpy()].detach().cpu().numpy())
-                    inliers += indices_of_inliers
-            return inliers
+                passed_test = torch.zeros_like(force_return)
+                if test_candidates.any():
+                    z = model(data[test_candidates])
+                    jac = model.nf.jacobian(run_forward=False)
+                    sample_losses = 0.5 * torch.sum(z**2, dim=1) - jac
+                    passed_test[test_candidates] = sample_losses <= threshold
+
+                is_recovered = force_return | passed_test
+                if is_recovered.any():
+                    recovered_inliers.extend(index[is_recovered].tolist())
+
+            return recovered_inliers
 
         def evaluate(model, dataloader):
             model.eval()
@@ -109,48 +115,26 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
                     shuffle=True,
                 )
                 outliers, last_mean, last_std = train_one_epoch(
-                    model, optimizer, good_data_dataloader, std_cutoff)
-                #print("outliers ", len(outliers))
-                filtered_outliers = [
-                    outlier for outlier in outliers if random.random() > 0.01
-                ]
+                    model, optimizer, good_data_dataloader, std_cutoff
+                )
 
-                # Remove only the selected outliers
-                data_holder.remove_outliers(filtered_outliers)
-                if last_mean and data_holder.get_n_bad() > 0:
+                data_holder.remove_outliers(outliers)
+
+                if last_mean is not None and data_holder.get_n_bad() > 0:
                     bad_data_dataloader = torch.utils.data.DataLoader(
                         utl.CustomDataset(data_holder.get_bad_data()),
                         batch_size=batch_size,
-                        shuffle=True,
+                        shuffle=True, # NOTE: Shuffle isn't strictly necessary here anymore
                     )
-                    inliers = check_for_inliers(model, bad_data_dataloader,
-                                                last_mean, last_std,
-                                                std_cutoff)
-                    #print("inliers ", len(inliers))
-                    data_holder.add_inliers(inliers)
-
-                    if data_holder.get_n_bad() == 0:
-                        #print("No samples left in bad data")
-                        continue
-                    bad_data_dataloader = torch.utils.data.DataLoader(
-                        utl.CustomDataset(data_holder.get_bad_data()),
-                        batch_size=batch_size,
-                        shuffle=True,
+                    
+                    # TODO: Implement an annealing schedule for eps based on the current epoch
+                    current_eps = 0.01 
+                    
+                    recovered = check_for_inliers(
+                        model, bad_data_dataloader, last_mean, last_std, std_cutoff, current_eps
                     )
-                    if data_holder.get_n_good() == 0:
-                        #print("No samples left in good data")
-                        continue
-                    good_data_dataloader = torch.utils.data.DataLoader(
-                        utl.CustomDataset(data_holder.get_good_data()),
-                        batch_size=batch_size,
-                        shuffle=True,
-                    )
-                    #bad_data_scores = evaluate(model, bad_data_dataloader)
-                    #good_data_scores = evaluate(model, good_data_dataloader)
-                    #print(np.mean(bad_data_scores))
-                    #print(len(bad_data_scores))
-                    #print(np.mean(good_data_scores))
-                    #print(len(good_data_scores))
+                    
+                    data_holder.add_inliers(recovered)
             return model
 
         # Normalize the data

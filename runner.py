@@ -54,5 +54,5 @@ if __name__ == "__main__":
         help="Which dataset id to run on (0,1,...,4)",
     )
     args = parser.parse_args()
-    _, n_severities, n_runs = find_args('testsets_new/')
+    _, n_severities, n_runs = find_args('testsets/')
     TestAnomalyDetector(args.dset, n_severities, n_runs)

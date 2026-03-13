@@ -43,7 +43,7 @@ def TestAnomalyDetector(data_set_id, n_severities, n_runs):
                                       'run', 'train_set', 'severity', 'alg',
                                       'acc', 'auroc'
                                   ])
-                file_name = f'res_files_new_eps/{i}.csv'
+                file_name = f'res_files/{i}.csv'
                 df.to_csv(file_name,
                           mode='a',
                           index=False,
