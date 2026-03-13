@@ -316,3 +316,4 @@ dump.txt
 /tmp_imgs
 /tmp_imgs2
 *.pyc
+/anomaly_detector/OLD
