@@ -7,3 +7,4 @@ dropout = 0.0
 learning_rate = 1e-5
 batch_size = 128
 device = 'cuda'  #'cpu'
+explore_eps = 0.75

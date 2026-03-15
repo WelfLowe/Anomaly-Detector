@@ -1,10 +1,16 @@
 #!/bin/bash
 
+TAG=${1:-$(date +%Y%m%d_%H%M%S)}
+mkdir -p "res_files/$TAG"
+
+# NOTE: Generate the single manifest containing algorithm info before parallelizing
+python runner.py --setup --tag "$TAG"
+if [ $? -ne 0 ]; then
+    echo "Setup failed. Exiting."
+    exit 1
+fi
+
 for i in {0..4}
 do
-  # Create a new screen session named "run_session_i" and execute run.py with --arg set to the current value of i
-  screen -dmS "run_$i" bash -c "python runner.py --dataset $i"
+  screen -dmS "run_${TAG}_$i" bash -c "python runner.py --dataset $i --tag $TAG"
 done
-
-# chmod +x run_script.sh
-# run_script.sh

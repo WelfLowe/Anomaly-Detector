@@ -318,3 +318,4 @@ dump.txt
 *.pyc
 /anomaly_detector/OLD
 /misc
+/logs

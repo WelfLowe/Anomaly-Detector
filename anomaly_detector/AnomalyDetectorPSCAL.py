@@ -1,13 +1,9 @@
-from abc import ABC, abstractmethod
 from typing import List
 import numpy as np
-import random
 import torch
 import anomaly_detector.NF.utils as utl
 import anomaly_detector.NF.model as mdl
-import anomaly_detector.NF.real_nvp_model as nvp_mdl
 import anomaly_detector.NF.config as c
-
 from anomaly_detector.AnomalyDetector import AnomalyDetector
 
 
@@ -16,11 +12,18 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
     def get_name(self) -> str:
         return "PSCAL"
 
-    def train_eval(self, r, s) -> List[float]:
-        """Train and evaluate the anomaly detector."""
-        """Return accuracy and AUROC."""
+    def get_params(self) -> dict:
+        # NOTE: eps is currently static. Update this mapping if an annealing schedule is added later.
+        return {
+            "eps": c.explore_eps,
+            "xi": c.std_cutoff
+        }
 
-        def train_one_epoch(model, optimizer, dataloader, std_cutoff):
+    def train_eval(self, r, s) -> List[float]:
+        eps = c.explore_eps
+        xi = c.std_cutoff
+
+        def train_one_epoch(model, optimizer, dataloader, xi):
             model.train()
             outliers = []
             last_mean, last_std = None, None
@@ -35,13 +38,13 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
 
                 batch_mean = torch.mean(sample_losses)
                 batch_std = torch.std(sample_losses)
-                threshold = batch_mean + std_cutoff * batch_std
+                threshold = batch_mean + xi * batch_std
 
                 is_outlier = sample_losses > threshold
                 is_inlier = ~is_outlier
 
                 if is_outlier.any():
-                    outliers.extend(index[is_outlier].tolist())
+                    outliers.extend(index[is_outlier.cpu()].tolist())
 
                 if is_inlier.any():
                     inlier_loss = torch.mean(sample_losses[is_inlier])
@@ -54,15 +57,14 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
             return outliers, last_mean, last_std
 
         @torch.no_grad()
-        def check_for_inliers(model, dataloader, mean, std, std_cutoff, eps):
+        def check_for_inliers(model, dataloader, mean, std, xi, eps):
             model.eval()
             recovered_inliers = []
-            threshold = mean + std * std_cutoff
+            threshold = mean + std * xi
 
             for data, index in dataloader:
                 data = data.to(c.device)
                 
-                # NOTE: eps-greedy exploration
                 rand_probs = torch.rand(data.size(0), device=c.device)
                 force_return = rand_probs < eps
                 test_candidates = ~force_return
@@ -76,7 +78,7 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
 
                 is_recovered = force_return | passed_test
                 if is_recovered.any():
-                    recovered_inliers.extend(index[is_recovered].tolist())
+                    recovered_inliers.extend(index[is_recovered.cpu()].tolist())
 
             return recovered_inliers
 
@@ -91,17 +93,13 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
                 loss_list += list(utl.t2np(loss))
             return loss_list
 
-        def train(data_holder, epochs, std_cutoff, n_coupling_blocks,
-                  clamp_alpha, fc_internal, dropout, learning_rate,
-                  batch_size):
+        def train(data_holder, epochs, xi, n_coupling_blocks, clamp_alpha, fc_internal, dropout, learning_rate, batch_size):
             n_features = data_holder.get_n_features()
-            model = mdl.DifferNet(n_features, n_coupling_blocks, clamp_alpha,
-                                  fc_internal, dropout)
-            #model = nvp_mdl.RealNVP(n_features, n_coupling_blocks, fc_internal)
+            model = mdl.DifferNet(n_features, n_coupling_blocks, clamp_alpha, fc_internal, dropout)
             model.to(c.device)
+            
             optimizer = torch.optim.Adam(
                 model.nf.parameters(),
-                #model.parameters(),
                 lr=learning_rate,
                 betas=(0.9, 0.999),
                 eps=1e-08,
@@ -115,7 +113,7 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
                     shuffle=True,
                 )
                 outliers, last_mean, last_std = train_one_epoch(
-                    model, optimizer, good_data_dataloader, std_cutoff
+                    model, optimizer, good_data_dataloader, xi
                 )
 
                 data_holder.remove_outliers(outliers)
@@ -124,33 +122,30 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
                     bad_data_dataloader = torch.utils.data.DataLoader(
                         utl.CustomDataset(data_holder.get_bad_data()),
                         batch_size=batch_size,
-                        shuffle=True, # NOTE: Shuffle isn't strictly necessary here anymore
+                        shuffle=True,
                     )
                     
                     # TODO: Implement an annealing schedule for eps based on the current epoch
-                    current_eps = 0.01 
-                    
                     recovered = check_for_inliers(
-                        model, bad_data_dataloader, last_mean, last_std, std_cutoff, current_eps
+                        model, bad_data_dataloader, last_mean, last_std, xi, eps
                     )
                     
                     data_holder.add_inliers(recovered)
             return model
 
-        # Normalize the data
-        data_norm = (self.data - self.data.min()) / (self.data.max() -
-                                                     self.data.min())
+        data_norm = (self.data - self.data.min()) / (self.data.max() - self.data.min())
         data_norm = data_norm.reshape(self.K, self.N)
         data_holder = utl.DataHolder(data_norm)
 
-        model = train(data_holder, c.epochs, c.std_cutoff, c.n_coupling_blocks,
-                      c.clamp_alpha, c.fc_internal, c.dropout, c.learning_rate,
-                      c.batch_size)
+        model = train(
+            data_holder, c.epochs, xi, c.n_coupling_blocks,
+            c.clamp_alpha, c.fc_internal, c.dropout, c.learning_rate, c.batch_size
+        )
 
-        val_data_norm = (self.val_data - self.data.min()) / (self.data.max() -
-                                                             self.data.min())
+        val_data_norm = (self.val_data - self.data.min()) / (self.data.max() - self.data.min())
         val_data_norm = val_data_norm.reshape(val_data_norm.shape[0], self.N)
         data_holder = utl.DataHolder(val_data_norm)
+        
         dataloader = torch.utils.data.DataLoader(
             utl.CustomDataset(data_holder.get_data()),
             batch_size=c.batch_size,
@@ -160,6 +155,7 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
 
         anomalies = scores_val > 3 * np.std(scores_val)
         prediction_labels = np.where(anomalies, 0, 1)
+        
         accuracy = self.get_accuracy(prediction_labels, self.val_labels)
         auroc = self.get_auroc(scores_val, self.val_labels)
 
