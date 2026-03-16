@@ -7,10 +7,12 @@ WINDOW = 1
 
 # NOTE: Define your folders, their display tag, and the algorithms to extract
 SOURCES = [
-    {"dir": "res_files", "tag": "-(eps=0.01)", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    {"dir": "res_files/20260315_234620", "tag": "-(eps=0.75)", "algs": ["PSCAL"]},
-    {"dir": "res_files/20260316_000813", "tag": "-(eps=0.0)", "algs": ["PSCAL"]},
-    {"dir": "res_files/20260316_072519", "tag": "-(eps=0.01, xi=2)", "algs": ["PSCAL"]},   
+    #{"dir": "res_files/original", "tag": "-(org)", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260315_234620", "tag": "-(eps=0.75)", "algs": ["PSCAL"]},
+    #{"dir": "res_files/20260316_000813", "tag": "-(eps=0.0)", "algs": ["PSCAL"]},
+    #{"dir": "res_files/20260316_072519", "tag": "-(eps=0.01, xi=2)", "algs": ["PSCAL"]},   
+    {"dir": "res_files/20260316_134641", "tag": "-(eps=0, xi=3)", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    
 ]
 
 

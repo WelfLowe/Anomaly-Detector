@@ -20,6 +20,18 @@ class AnomalyDetector(ABC):
     def get_name(self) -> str:
         pass
 
+    def get_params(self) -> Dict:
+        params = {}
+        for key in dir(c):
+            if not key.startswith("__"):
+                val = getattr(c, key)
+                # NOTE: Cast complex objects like torch.device or modules to strings for JSON serialization
+                if isinstance(val, (int, float, str, bool, list, tuple, dict)):
+                    params[key] = val
+                else:
+                    params[key] = str(val)
+        return params
+
     def normalize(self, data: np.ndarray, d_min: float, d_max: float) -> np.ndarray:
         return (data - d_min) / (d_max - d_min)
 
@@ -63,10 +75,6 @@ class AnomalyDetector(ABC):
 class AnomalyDetectorPSCAL(AnomalyDetector):
     def get_name(self) -> str:
         return "PSCAL"
-
-    def get_params(self) -> Dict[str, float]:
-        # NOTE: eps is currently static. Update mapping if an annealing schedule is added later.
-        return {"eps": c.explore_eps, "xi": c.std_cutoff}
 
     def train_eval(self, dataset: DatasetInfo, r: int, s: int) -> Tuple[float, float]:
         data_norm = self.normalize(dataset.data, dataset.data_min, dataset.data_max).reshape(dataset.k, dataset.n)

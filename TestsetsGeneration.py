@@ -8,10 +8,8 @@ from testset_generator.DatasetGeneratorBlackout import DatasetGeneratorBlackout
 from testset_generator.DatasetGeneratorLift import DatasetGeneratorLift
 from testset_generator.DatasetGeneratorSeason import (DatasetGeneratorNoise, DatasetGeneratorAmplitude, DatasetGeneratorShift)
 
-def generate_dataset_pair(n, gen_idx, generator, s, K, N, base_dir):
-    sev_label = int(s * 29 / 4)
-    
-    # NOTE: Using 'fraction' to match the original DatasetGenerator signature
+def generate_dataset_pair(n, gen_idx, generator, s, sev_label, K, N, base_dir):
+    # NOTE: sev_label passed directly to avoid float truncation errors
     generator.generateKN(
         K, N, fraction=0.05, severeness=s, verbose=False,
         name=f"{base_dir}/train_{gen_idx}_{sev_label}_{n}"
@@ -26,9 +24,9 @@ def write_manifest(output_dir, metadata):
     with open(os.path.join(output_dir, "manifest.json"), "w") as f:
         json.dump(metadata, f, indent=4)
 
-output_directory = "testsets_new_new"
+output_directory = "testsets/testsets_updated2"
 K_train, N_points = 1000, 500
-n_sets = 50
+n_sets = 10 # 50
 severities = np.linspace(0, 4, 30)
 
 generators = [
@@ -55,12 +53,11 @@ write_manifest(output_directory, manifest_data)
 with concurrent.futures.ProcessPoolExecutor() as executor:
     futures = []
     for n in range(n_sets):
-        for i, gen in enumerate(generators):
-            for s in severities:
+        for gen_idx, gen in enumerate(generators):
+            for sev_label, s in enumerate(severities):
                 futures.append(
-                    executor.submit(generate_dataset_pair, n, i, gen, s, K_train, N_points, output_directory)
+                    executor.submit(generate_dataset_pair, n, gen_idx, gen, s, sev_label, K_train, N_points, output_directory)
                 )
     
     for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Generating Datasets"):
-        # NOTE: Surfaces any hidden worker exceptions
         future.result()

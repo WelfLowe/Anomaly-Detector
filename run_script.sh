@@ -10,7 +10,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-for i in {0..4}
-do
-  screen -dmS "run_${TAG}_$i" bash -c "python runner.py --dataset $i --tag $TAG"
+for i in {0..4}; do
+    tmux new-session -d -s "run_${TAG}_$i" "python runner.py --dataset $i --tag $TAG"
 done
+
+# NOTE: View active sessions with 'tmux ls'. Attach with 'tmux attach-session -t <session_name>'.
