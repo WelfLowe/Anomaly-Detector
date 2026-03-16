@@ -1,5 +1,5 @@
 epochs = 100
-std_cutoff = 3
+std_cutoff = 3 # matches 
 n_coupling_blocks = 3
 clamp_alpha = 3.0
 fc_internal = 512
@@ -7,4 +7,4 @@ dropout = 0.0
 learning_rate = 1e-5
 batch_size = 128
 device = 'cuda'  #'cpu'
-explore_eps = 0.75
+explore_eps = 0.00

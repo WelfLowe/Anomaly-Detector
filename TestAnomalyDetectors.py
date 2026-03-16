@@ -1,15 +1,16 @@
 import pandas as pd
 import os
 from tqdm import tqdm
-from anomaly_detector.AnomalyDetectorVanillaNF import AnomalyDetectorVanillaNF
-from anomaly_detector.AnomalyDetectorVanillaNFnoNoise import AnomalyDetectorVanillaNFnoNoise
-from anomaly_detector.AnomalyDetectorPSCAL import AnomalyDetectorPSCAL
-
+from anomaly_detector.AnomalyDetector import (
+    AnomalyDetectorPSCAL,
+    AnomalyDetectorVanillaNF,
+    AnomalyDetectorVanillaNFnoNoise
+)
 
 def get_detectors():
     return [
-        #AnomalyDetectorVanillaNF(),
-        #AnomalyDetectorVanillaNFnoNoise(),
+        AnomalyDetectorVanillaNF(),
+        AnomalyDetectorVanillaNFnoNoise(),
         AnomalyDetectorPSCAL()
     ]
 
