@@ -25,16 +25,18 @@ class VectorizedSeasonalGenerator(DatasetGenerator):
         ys += np.where(((xs - 24) % (p2 * 24)) < (2 * 24), a2, 0)
         ys += a3 * np.sin(2 * np.pi * (xs - (-6)) / (p3 * 24))
         
-        if name:
+        if name != "":
+            np.save(name + ".npy", ys)
             labels = np.zeros(K)
             labels[:n_anomalies] = 1
-            np.savez_compressed(name + ".npz", data=ys, labels=labels)
+            np.save(name + "_labels.npy", labels)
             
         return ys
 
     def load(self, name: str):
-        data = np.load(name + ".npz")
-        return [data['data'], data['labels']]
+        data = np.load(name + ".npy")
+        labels = np.load(name + "_labels.npy")
+        return [data, labels]
 
 
 class DatasetGeneratorNoise(VectorizedSeasonalGenerator):

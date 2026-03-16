@@ -5,32 +5,23 @@ from typing import List, Tuple, Dict
 import numpy as np
 import torch
 from sklearn.metrics import roc_auc_score
-
+from anomaly_detector.DatasetInfo import DatasetInfo
 import anomaly_detector.NF.utils as utl
 import anomaly_detector.NF.model as mdl
 import anomaly_detector.NF.config as c
 
 
 class AnomalyDetector(ABC):
-    def init(self, dataset_id: str):
-        self.data = np.load(f"testsets/train_{dataset_id}.npy")
-        self.labels = np.load(f"testsets/train_{dataset_id}_labels.npy")
-        self.val_data = np.load(f"testsets/val_{dataset_id}.npy")
-        self.val_labels = np.load(f"testsets/val_{dataset_id}_labels.npy")
-        self.K, self.N = self.data.shape
-        self.data_min = self.data.min()
-        self.data_max = self.data.max()
-
     @abstractmethod
-    def train_eval(self, r: int, s: int) -> Tuple[float, float]:
+    def train_eval(self, dataset: DatasetInfo, r: int, s: int) -> Tuple[float, float]:
         pass
 
     @abstractmethod
     def get_name(self) -> str:
         pass
 
-    def normalize(self, data: np.ndarray) -> np.ndarray:
-        return (data - self.data_min) / (self.data_max - self.data_min)
+    def normalize(self, data: np.ndarray, d_min: float, d_max: float) -> np.ndarray:
+        return (data - d_min) / (d_max - d_min)
 
     def get_accuracy(self, predicted_labels: np.ndarray, val_labels: np.ndarray) -> float:
         accuracy = np.mean(predicted_labels == val_labels)
@@ -53,8 +44,8 @@ class AnomalyDetector(ABC):
                 loss_list.extend(utl.t2np(loss).tolist())
         return loss_list
 
-    def _get_validation_scores(self, model: torch.nn.Module) -> Tuple[float, float]:
-        val_data_norm = self.normalize(self.val_data).reshape(-1, self.N)
+    def _get_validation_scores(self, model: torch.nn.Module, dataset: DatasetInfo) -> Tuple[float, float]:
+        val_data_norm = self.normalize(dataset.val_data, dataset.data_min, dataset.data_max).reshape(-1, dataset.n)
         data_holder = utl.DataHolder(val_data_norm)
         dataloader = torch.utils.data.DataLoader(
             utl.CustomDataset(data_holder.get_data()),
@@ -66,7 +57,7 @@ class AnomalyDetector(ABC):
         anomalies = scores_val > 3 * np.std(scores_val)
         prediction_labels = np.where(anomalies, 0, 1)
         
-        return self.get_accuracy(prediction_labels, self.val_labels), self.get_auroc(scores_val, self.val_labels)
+        return self.get_accuracy(prediction_labels, dataset.val_labels), self.get_auroc(scores_val, dataset.val_labels)
 
 
 class AnomalyDetectorPSCAL(AnomalyDetector):
@@ -77,8 +68,8 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
         # NOTE: eps is currently static. Update mapping if an annealing schedule is added later.
         return {"eps": c.explore_eps, "xi": c.std_cutoff}
 
-    def train_eval(self, r: int, s: int) -> Tuple[float, float]:
-        data_norm = self.normalize(self.data).reshape(self.K, self.N)
+    def train_eval(self, dataset: DatasetInfo, r: int, s: int) -> Tuple[float, float]:
+        data_norm = self.normalize(dataset.data, dataset.data_min, dataset.data_max).reshape(dataset.k, dataset.n)
         data_holder = utl.DataHolder(data_norm)
         
         model = mdl.DifferNet(data_holder.get_n_features(), c.n_coupling_blocks, c.clamp_alpha, c.fc_internal, c.dropout).to(c.device)
@@ -95,7 +86,7 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
                 recovered = self._check_inliers(model, loader_bad, last_mean, last_std, c.std_cutoff, c.explore_eps)
                 data_holder.add_inliers(recovered)
 
-        scores = self._get_validation_scores(model)
+        scores = self._get_validation_scores(model, dataset)
 
         # NOTE: Force PyTorch to release VRAM before the next iteration starts
         del model
@@ -160,12 +151,12 @@ class AnomalyDetectorPSCAL(AnomalyDetector):
 
 
 class BaseVanillaNF(AnomalyDetector):
-    def train_eval_vanilla(self, r: int, s: int, filter_noise: bool) -> Tuple[float, float]:
-        data_norm = self.normalize(self.data).reshape(self.K, self.N)
+    def train_eval_vanilla(self, dataset: DatasetInfo, r: int, s: int, filter_noise: bool) -> Tuple[float, float]:
+        data_norm = self.normalize(dataset.data, dataset.data_min, dataset.data_max).reshape(dataset.k, dataset.n)
         if filter_noise:
-            data_norm = data_norm[self.labels == 0]
+            data_norm = data_norm[dataset.labels == 0]
             
-        labels_to_use = self.labels if not filter_noise else self.labels[self.labels == 0]
+        labels_to_use = dataset.labels if not filter_noise else dataset.labels[dataset.labels == 0]
         data_holder = utl.DataHolderLabeled(data_norm, labels_to_use)
         
         model = mdl.DifferNet(data_holder.get_n_features(), c.n_coupling_blocks, c.clamp_alpha, c.fc_internal, c.dropout).to(c.device)
@@ -178,9 +169,8 @@ class BaseVanillaNF(AnomalyDetector):
             loader = torch.utils.data.DataLoader(utl.CustomDatasetLabel(data_holder.get_data(), data_holder.get_labels()), batch_size=c.batch_size, shuffle=True)
             self._train_epoch(model, optimizer, loader, epoch, r, s, log_file)
 
-        scores = self._get_validation_scores(model)
+        scores = self._get_validation_scores(model, dataset)
 
-        # NOTE: Force PyTorch to release VRAM before the next iteration starts
         del model
         del optimizer
         del data_holder
@@ -218,13 +208,13 @@ class AnomalyDetectorVanillaNF(BaseVanillaNF):
     def get_name(self) -> str:
         return "vanillaNF"
     
-    def train_eval(self, r: int, s: int) -> Tuple[float, float]:
-        return self.train_eval_vanilla(r, s, filter_noise=False)
+    def train_eval(self, dataset: DatasetInfo, r: int, s: int) -> Tuple[float, float]:
+        return self.train_eval_vanilla(dataset, r, s, filter_noise=False)
 
 
 class AnomalyDetectorVanillaNFnoNoise(BaseVanillaNF):
     def get_name(self) -> str:
         return "vanillaNFnoNoise"
     
-    def train_eval(self, r: int, s: int) -> Tuple[float, float]:
-        return self.train_eval_vanilla(r, s, filter_noise=True)
+    def train_eval(self, dataset: DatasetInfo, r: int, s: int) -> Tuple[float, float]:
+        return self.train_eval_vanilla(dataset, r, s, filter_noise=True)

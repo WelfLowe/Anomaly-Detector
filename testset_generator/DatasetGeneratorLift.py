@@ -39,15 +39,15 @@ class DatasetGeneratorLift(DatasetGenerator):
         a3 = 5 + np.random.normal(0, 0.1, (K, 1))
         ys += a3 * np.sin(2 * np.pi * (xs - (-6)) / p3)
         
-        if name:
-            # TODO: Update main script to handle .npz reading instead of two .npy files
+        if name != "":
+            np.save(name + ".npy", ys)
             labels = np.zeros(K)
             labels[:n_anomalies] = 1
-            np.savez_compressed(name + ".npz", data=ys, labels=labels)
+            np.save(name + "_labels.npy", labels)
             
         return ys
 
     def load(self, name: str):
-        # NOTE: Matching the new .npz save format
-        data = np.load(name + ".npz")
-        return [data['data'], data['labels']]
+        data = np.load(name + ".npy")
+        labels = np.load(name + "_labels.npy")
+        return [data, labels]

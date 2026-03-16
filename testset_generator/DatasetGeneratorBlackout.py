@@ -44,13 +44,15 @@ class DatasetGeneratorBlackout(DatasetGenerator):
         
         ys = (ys * b) + 150
         
-        if name:
+        if name != "":
+            np.save(name + ".npy", ys)
             labels = np.zeros(K)
             labels[:n_anomalies] = 1
-            np.savez_compressed(name + ".npz", data=ys, labels=labels)
+            np.save(name + "_labels.npy", labels)
             
         return ys
 
     def load(self, name: str):
-        data = np.load(name + ".npz")
-        return [data['data'], data['labels']]
+        data = np.load(name + ".npy")
+        labels = np.load(name + "_labels.npy")
+        return [data, labels]
