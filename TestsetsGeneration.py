@@ -24,7 +24,7 @@ def write_manifest(output_dir, metadata):
     with open(os.path.join(output_dir, "manifest.json"), "w") as f:
         json.dump(metadata, f, indent=4)
 
-output_directory = "testsets/testsets_updated2"
+output_directory = "testsets/testsets_updated_more"
 K_train, N_points = 1000, 500
 n_sets = 10 # 50
 severities = np.linspace(0, 4, 30)

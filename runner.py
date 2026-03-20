@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="0")
     parser.add_argument("--tag", type=str, required=True)
-    parser.add_argument("--testset_dir", type=str, default="testsets/testsets_updated2")
+    parser.add_argument("--testset_dir", type=str, default="testsets/testsets_original")
     parser.add_argument("--setup", action="store_true")
     args = parser.parse_args()
 

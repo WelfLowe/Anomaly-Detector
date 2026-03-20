@@ -1,3 +1,5 @@
+import os
+import json
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -5,16 +7,19 @@ import matplotlib.pyplot as plt
 DATASETS = [0, 1, 2, 3, 4]
 WINDOW = 1
 
-# NOTE: Define your folders, their display tag, and the algorithms to extract
 SOURCES = [
-    #{"dir": "res_files/original", "tag": "-(org)", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260315_234620", "tag": "-(eps=0.75)", "algs": ["PSCAL"]},
-    #{"dir": "res_files/20260316_000813", "tag": "-(eps=0.0)", "algs": ["PSCAL"]},
-    #{"dir": "res_files/20260316_072519", "tag": "-(eps=0.01, xi=2)", "algs": ["PSCAL"]},   
-    {"dir": "res_files/20260316_134641", "tag": "-(eps=0, xi=3)", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    
+    #{"dir": "res_files/original", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260316_072519", "algs": ["PSCAL"]},
+    #{"dir": "res_files/20260316_134641", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260316_150134", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260316_150229", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260316_153137", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260317_003719", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260317_092943", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260317_103859", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    #{"dir": "res_files/20260317_120250", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    {"dir": "res_files/20260317_142258", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
 ]
-
 
 BASE_LABELS = {
     "vanillaNF": "Vanilla NF",
@@ -22,18 +27,33 @@ BASE_LABELS = {
     "vanillaNFnoNoise": "Vanilla NF (w/o noise)"
 }
 
+# NOTE: Dynamically generate tags from manifest params
+for src in SOURCES:
+    manifest_path = os.path.join(src["dir"], "manifest.json")
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+            
+        params = manifest["algorithms"][0]["params"]
+        x = params.get("std_cutoff", 0)
+        e = params.get("explore_eps", 0)
+        h = params.get("fc_internal", 0)
+        
+        src["tag"] = f" (x{x:.1f}-e{e:.1f}-h{h:.1f})"
+    except (FileNotFoundError, KeyError, IndexError):
+        src["tag"] = " (unknown)"
+
 fig, axs = plt.subplots(2, 3, figsize=(12, 6))
 axs = axs.flatten()
 
 def load_and_merge_data(dataset_id):
     df_list = []
     for src in SOURCES:
+        file_path = os.path.join(src['dir'], f"{dataset_id}.csv")
         try:
-            df = pd.read_csv(f"{src['dir']}/{dataset_id}.csv")
+            df = pd.read_csv(file_path)
             df = df[df['alg'].isin(src['algs'])].copy()
-            
-            # Map to readable names and append the source tag for the legend
-            df['alg'] = df['alg'].map(BASE_LABELS).fillna(df['alg']) + src['tag']
+            df['alg'] = df['alg'].map(BASE_LABELS).fillna(df['alg'])# + src['tag']
             df_list.append(df)
         except FileNotFoundError:
             continue
@@ -48,7 +68,6 @@ def load_and_merge_data(dataset_id):
         lambda x: x.rolling(window=WINDOW).mean()
     )
     return combined_data.dropna().reset_index(drop=True)
-
 
 total_lines = sum(len(src['algs']) for src in SOURCES)
 palette = sns.color_palette("tab10", total_lines)
@@ -65,7 +84,8 @@ for i, d in enumerate(DATASETS):
         hue='alg',
         palette=palette,
         ax=axs[i],
-        legend=(i == 0) 
+        legend=(i == 0),
+        errorbar=("ci", 95)
     )
 
     axs[i].set_title(f"Dataset {d}")
