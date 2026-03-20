@@ -8,17 +8,7 @@ DATASETS = [0, 1, 2, 3, 4]
 WINDOW = 1
 
 SOURCES = [
-    #{"dir": "res_files/original", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260316_072519", "algs": ["PSCAL"]},
-    #{"dir": "res_files/20260316_134641", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260316_150134", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260316_150229", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260316_153137", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260317_003719", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260317_092943", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260317_103859", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    #{"dir": "res_files/20260317_120250", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
-    {"dir": "res_files/20260317_142258", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
+    {"dir": "res_files/YOUR_TAG", "algs": ["vanillaNF", "PSCAL", "vanillaNFnoNoise"]},
 ]
 
 BASE_LABELS = {
