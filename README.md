@@ -5,7 +5,7 @@ This is a repository for the paper: *Anomaly detection in unlabeled signals*. In
 
 ## How to Test Run
 
-To execute the full pipeline—from data generation to anomaly detection and visualization—ensure your environment is set up and follow the steps below.
+To execute the full pipeline, from data generation to anomaly detection and visualization, ensure your environment is set up and follow the steps below.
 
 ### Setup Environment
 Install the required dependencies:
@@ -33,7 +33,7 @@ Execute the anomaly detection algorithms across the generated datasets. The bash
 Results and the execution manifest are saved to `res_files/<TAG>/`. To monitor the background tasks, attach to the tmux sessions (e.g., `tmux attach -t run_<TAG>_0`).
 
 ### Step 3: Plot Results
-[Insert instructions for plotting/aggregating the results. E.g.: Run the plotting script to parse the predictions in `res_files/<TAG>/` and generate the ROC-AUC performance graphs.]
+In order to create visualization of the results its possible to use our `comparison_ploy.py` located inseide the `viz` folder.
 
 ```bash
 # Example
